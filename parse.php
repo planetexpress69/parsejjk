@@ -53,7 +53,7 @@ CREATE TABLE `aktuelle_anzeigen` (
 $mysqlHost 				= '127.0.0.1';
 $mysqlUser 				= 'root';
 $mysqlPass 				= 'xxxx';
-$mysqlDatabase 			= 'test';
+$mysqlDatabase 			= 'blitztest';
 $mysqlTable 			= 'aktuelle_anzeigen';
 
 $inputDir 				= "in";
@@ -123,7 +123,7 @@ foreach ($aFilesToProcess as $fileName) {
 	$startDate 			= substr($splittedFileName[1], 6, 10);
 	$endDate   			= date ('Y-m-d', strtotime($startDate) + (7 * 24 * 3600));	
 	
-	$fp = fopen('./in/' . $fileName,'r') or die("can't open file");
+	$fp = fopen('./'. $inputDir . '/' . $fileName,'r') or die("can't open file");
 	
 	$currentHead 		= "";
 	
@@ -179,6 +179,8 @@ foreach ($aFilesToProcess as $fileName) {
 		}
 			
 	}
+	
+	moveProcessedFile($fileName);
 
 }
 
@@ -328,6 +330,16 @@ function updateRecord($recordId, $dIssue)
     	die($message);
 	}
 	
+}
+
+function moveProcessedFile($fileName)  {
+
+	global $inputDir, $outDir;
+
+	if (copy('./' . $inputDir . '/'  . $fileName, './' . $outDir . '/'  . $fileName)) {
+  		unlink('./' . $inputDir . '/'  . $fileName);
+	}
+
 }
 
 /*
