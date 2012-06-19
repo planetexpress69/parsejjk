@@ -17,7 +17,7 @@
 /*
 CREATE DATABASE test;
 CREATE TABLE `aktuelle_anzeigen` (
-  `id` bigint(20) unsigned NOT NULL default '0',
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `anzeigen_typ` tinyint(1) NOT NULL default '0',
   `rubrik` int(10) NOT NULL default '0',
   `anz_text` text NOT NULL,
@@ -47,27 +47,30 @@ CREATE TABLE `aktuelle_anzeigen` (
   KEY `verlag_id5` (`verlag_id5`),
   FULLTEXT KEY `anz_text` (`anz_text`)
 ) TYPE=MyISAM;
+
+ALTER TABLE aktuelle_anzeigen AUTO_INCREMENT = 400000;
+
  */
 
-$mysqlHost 				= 'localhost';
-$mysqlUser 				= 'root';
-$mysqlPass 				= '';
-$mysqlDatabase 			= 'blitzverlag';
-$mysqlTable 			= 'aktuelle_anzeigen';
+$mysqlHost				= 'localhost';
+$mysqlUser				= 'root';
+$mysqlPass				= '';
+$mysqlDatabase			= 'blitzverlag';
+$mysqlTable			= 'aktuelle_anzeigen';
 
-$inputDir 				= "in";
-$outDir 				= "out";
+$inputDir				= "in";
+$outDir					= "out";
 $expectedNumberOfFiles 	= 8;
 
 $kopfPattern 			= "@Kopf1:";
-$recordPattern 			= "@Fliess:";
+$recordPattern			= "@Fliess:";
 
-$currentIssue 			= "";
-$startDate          	= "";
+$currentIssue			= "";
+$startDate				= "";
 $currentCategory 		= "";
 		
 $issues 				= array (
-    						'800'=> '0',
+							'800'=> '0',
 							'WB' => '1',
 							'SB' => '2',
 							'RB' => '3',
@@ -79,36 +82,36 @@ $issues 				= array (
 
 $categories 			= array (
 							'Allgemein' 			=> '',
-							'Immobiliengesuche'     => '7',
-    						'Immobilienangebote'    => '20',
-    						'Wohnungsgesuche'       => '6',
-    						'Wohnungsangebote'      => '28',
-    						'Nachmieter'            => '33',
-    						'Fahrzeugmarkt'         => '1',
-    						'Wohnwagen'             => '39',
-    						'Wassersport'           => '10',
-    						'Verkaufe'              => '2',
-    						'Verschenke'            => '27',
-    						'Suche'                 => '3',
-    						'Dienstleistungen'      => '29',
-    						'Stellengesuche'        => '4',
-    						'Stellenangebote'       => '25',
-    						'Tiermarkt'             => '22',
-    						'Urlaub'                => '21',
-    						'Geldmarkt'             => '34',
-    						'Sonstiges'             => '11',
-    						'Partnerschaft'         => '9',
-    						'Bars & Clubs'          => '23',
-    						'Kontakte'              => '23'
+							'Immobiliengesuche' 	=> '7',
+							'Immobilienangebote'	=> '20',
+							'Wohnungsgesuche'   	=> '6',
+							'Wohnungsangebote'  	=> '28',
+							'Nachmieter'			=> '33',
+							'Fahrzeugmarkt' 		=> '1',
+							'Wohnwagen' 			=> '39',
+							'Wassersport'   		=> '10',
+							'Verkaufe'  			=> '2',
+							'Verschenke'			=> '27',
+							'Suche' 				=> '3',
+							'Dienstleistungen'  	=> '29',
+							'Stellengesuche'		=> '4',
+							'Stellenangebote'   	=> '25',
+							'Tiermarkt' 			=> '22',
+							'Urlaub'				=> '21',
+							'Geldmarkt' 			=> '34',
+							'Sonstiges' 			=> '11',
+							'Partnerschaft' 		=> '9',
+							'Bars & Clubs'  		=> '23',
+							'Kontakte'  			=> '23'
 						);
 
 # file name pattern
-$patternFilename 		= '#^([^_]+)_AllRub(\d+-\d+-\d+).txt#i';
+$patternFilename		= '#^([^_]+)_AllRub(\d+-\d+-\d+).txt#i';
 
 # chiffre pattern
-$patternChiffre 		= '#Chiffre\s(\d+\/\d+)#';
+$patternChiffre			= '#Chiffre\s(\d+\/\d+)#';
 
-$aFilesToProcess 		= getDirectoryList($inputDir, $patternFilename);
+$aFilesToProcess		= getDirectoryList($inputDir, $patternFilename);
 
 if (count($aFilesToProcess) != $expectedNumberOfFiles) {
 	die ('Would like to see ' . $expectedNumberOfFiles . ' files! Got ' . count($aFilesToProcess) . ' instead... Bailing out... ä²');
@@ -225,30 +228,30 @@ function extractRecord ($line)
 
 function getDirectoryList($directory, $pattern = '/./') 
 {
-   
-    $results = array();
-    $handler = opendir($directory);
 
-    while ($fileName = readdir($handler)) {
-   		if(preg_match ($pattern,  $fileName, $hits)) {
+	$results = array();
+	$handler = opendir($directory);
+
+	while ($fileName = readdir($handler)) {
+		if(preg_match ($pattern,  $fileName, $hits)) {
 			$results[] = $fileName;
-		}		
+		}
 	}
 
-    closedir($handler);
-    return $results;
-    
+	closedir($handler);
+	return $results;
+
 }
 
 function endsWith($check, $endStr) 
 {
 	
 	if (!is_string($check) || !is_string($endStr) || strlen($check) < strlen($endStr)) {
-    	return false;
-    }
- 
-    return (substr($check, strlen($check)-strlen($endStr), strlen($endStr)) === $endStr);
-    
+		return false;
+	}
+
+	return (substr($check, strlen($check)-strlen($endStr), strlen($endStr)) === $endStr);
+	
 }
 
 
@@ -275,13 +278,13 @@ function fetchRecord($record, $startDate)
 	$result = mysql_query($query);
 	
 	if (!$result) {
-    	$message  = 'Error: ' . mysql_error() . "\n";
-    	$message .= 'Query: ' . $query;
-    	die($message);
+		$message  = 'Error: ' . mysql_error() . "\n";
+		$message .= 'Query: ' . $query;
+		die($message);
 	}
 		
 	while ($row = mysql_fetch_assoc($result)) {
-    	$res = $row['id'];
+		$res = $row['id'];
 	}
 	
 	mysql_close($conn);
@@ -316,9 +319,9 @@ function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiff
 	$result = mysql_query($query);
 	
 	if (!$result) {
-    	$message  = 'Ungültige Abfrage: ' . mysql_error() . "\n";
-    	$message .= 'Gesamte Abfrage: ' . $query;
-    	die ($message);    	
+		$message  = 'Ungültige Abfrage: ' . mysql_error() . "\n";
+		$message .= 'Gesamte Abfrage: ' . $query;
+		die ($message);		
    	}
 
 }
@@ -326,9 +329,9 @@ function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiff
 function updateRecord($recordId, $dIssue) 
 {
 
-    if ($dIssue == 0) {
-    	return;
-    }
+	if ($dIssue == 0) {
+		return;
+	}
 
 	global $mysqlTable;
 
@@ -337,9 +340,9 @@ function updateRecord($recordId, $dIssue)
 	$result = mysql_query($query);
 	
 	if (!$result) {
-    	$message  = 'Ungültige Abfrage: ' . mysql_error() . "\n";
-    	$message .= 'Gesamte Abfrage: ' . $query;
-    	die($message);
+		$message  = 'Ungültige Abfrage: ' . mysql_error() . "\n";
+		$message .= 'Gesamte Abfrage: ' . $query;
+		die($message);
 	}
 	
 }
@@ -350,7 +353,7 @@ function moveProcessedFile($fileName)
 	global $inputDir, $outDir;
 
 	if (copy('./' . $inputDir . '/'  . $fileName, './' . $outDir . '/'  . $fileName)) {
-  		unlink('./' . $inputDir . '/'  . $fileName);
+		unlink('./' . $inputDir . '/'  . $fileName);
 	}
 
 }
@@ -366,9 +369,9 @@ function pase($fileName) {
 	$aC = preg_split ('/@Kopf1:/si', $sD, NULL, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY); # Daten in Bloecke aufsplitten
  
 	foreach ($aC as $sC) { # alle Bloecke abarbeiten
-    	preg_match ('/^(.+)\s+(.+)$/Usi', $sC, $aX); # Kategorie-Titel und Rest aus Block holen
-    	preg_match_all ('/\@Fliess\:(.+)/i', $aX[2], $aI); # aus Rest die Elemente ermitteln
-    	var_dump (array ('title' => $aX[1], 'items' => $aI[1])); # Ausgabe
+		preg_match ('/^(.+)\s+(.+)$/Usi', $sC, $aX); # Kategorie-Titel und Rest aus Block holen
+		preg_match_all ('/\@Fliess\:(.+)/i', $aX[2], $aI); # aus Rest die Elemente ermitteln
+		var_dump (array ('title' => $aX[1], 'items' => $aI[1])); # Ausgabe
 	}
 }
 */
