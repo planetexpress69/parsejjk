@@ -8,10 +8,13 @@
  * v0.1
  * mk
  * 2012-06-12
+ *
+ * notes: this file must be saved in "Windows Latin 1" encoding to keep
+ *
+ *
  *****************************************************************************/
 
 /*
-
 CREATE DATABASE test;
 CREATE TABLE `aktuelle_anzeigen` (
   `id` bigint(20) unsigned NOT NULL default '0',
@@ -44,16 +47,12 @@ CREATE TABLE `aktuelle_anzeigen` (
   KEY `verlag_id5` (`verlag_id5`),
   FULLTEXT KEY `anz_text` (`anz_text`)
 ) TYPE=MyISAM;
-
-
-
-
  */
 
-$mysqlHost 				= '127.0.0.1';
+$mysqlHost 				= 'localhost';
 $mysqlUser 				= 'root';
-$mysqlPass 				= 'xxxx';
-$mysqlDatabase 			= 'blitztest';
+$mysqlPass 				= '';
+$mysqlDatabase 			= 'blitzverlag';
 $mysqlTable 			= 'aktuelle_anzeigen';
 
 $inputDir 				= "in";
@@ -94,7 +93,7 @@ $categories 			= array (
     						'Dienstleistungen'      => '29',
     						'Stellengesuche'        => '4',
     						'Stellenangebote'       => '25',
-    						'Tiermarkt'             => '5',
+    						'Tiermarkt'             => '22',
     						'Urlaub'                => '21',
     						'Geldmarkt'             => '34',
     						'Sonstiges'             => '11',
@@ -112,11 +111,11 @@ $patternChiffre 		= '#Chiffre\s(\d+\/\d+)#';
 $aFilesToProcess 		= getDirectoryList($inputDir, $patternFilename);
 
 if (count($aFilesToProcess) != $expectedNumberOfFiles) {
-	die ('Would like to see ' . $expectedNumberOfFiles . ' files! Got ' . count($aFilesToProcess) . ' instead... Bailing out...');
+	die ('Would like to see ' . $expectedNumberOfFiles . ' files! Got ' . count($aFilesToProcess) . ' instead... Bailing out... ä²');
 }
 
 foreach ($aFilesToProcess as $fileName) {
-	
+
 	$splittedFileName 	= explode ('_', $fileName);
 	
 	$currentIssue 		= $splittedFileName[0];
@@ -128,23 +127,24 @@ foreach ($aFilesToProcess as $fileName) {
 	$currentHead 		= "";
 	
 	while($line = fgets($fp,1024)) {
-	
+		
+		$line = str_replace ('@Schlag:', '@Fliess:', $line);		# ummm, don't ask!
 		$line = str_replace ('<B>', '', $line);								
 		$line = str_replace ('<$f"Arial">', '', $line);				# strange font defs
 		$line = str_replace ('<$f"Wingdings">(', ' Tel. ', $line); 	# phone symbol
 		$line = str_replace ('<$f"Wingdings">*', ' ', $line);		# letter symbol
+		$line = str_replace ('<\@>', '@', $line);					# @ in email addresses...
 		$line = str_replace ('<+>2<+>', '²', $line);
 		$line = str_replace ('<+>3<+>', '³', $line);		
-		$line = str_replace ('  ', ' ', $line);
-		
-		
-		
+		$line = str_replace ('  ', ' ', $line);		
+				
 		if (stristr($line, $kopfPattern)) { // this is head
 			
 			$head = extractHead($line);
 			$currentHead = $head;
-			
-			// chiffre
+						
+			// chiffre, assuming that there's a record in the same line as the head. not the case when running on a linux box.
+			/*
 			if (preg_match ($patternChiffre,  $line, $hits)) {
 				$chiffre = $hits[1];
 			} else {
@@ -152,34 +152,38 @@ foreach ($aFilesToProcess as $fileName) {
 			}
 			
 			$record = extractRecord($line);	
+			*/
 								
 		} else if (stristr($line, $recordPattern)) { // this is record
 			
+			// extract chiffre
 			if (preg_match ($patternChiffre,  $line, $hits)) {
 				$chiffre = $hits[1];
 			} else {
 				$chiffre = false;
 			}
 			
+			// ectract record from line
 			$record = extractRecord($line);
 
 		} else {
-		
-			die ("Error!!! Looks like the line is somewhat garbled...");
-		
+			die ("Error!!! Looks like the line is somewhat garbled...<br />" . $line);
 		}		
 		
+		// conditional insert or update of record
 		$previouslyWrittenRecordId = false;
 		$previouslyWrittenRecordId = fetchRecord($record, $startDate);
 		
 		if ($previouslyWrittenRecordId != false) {
 			updateRecord($previouslyWrittenRecordId, $issues[$currentIssue]);
 		} else {
-			insertRecord($record, $startDate, $endDate, $issues[$currentIssue], $categories[$currentHead], $chiffre);
+			if ($record != "")
+				insertRecord($record, $startDate, $endDate, $issues[$currentIssue], $categories[$currentHead], $chiffre);
 		}
 			
 	}
 	
+	// we're done. move file out of the folder...
 	moveProcessedFile($fileName);
 
 }
@@ -191,9 +195,13 @@ function extractHead($line)
 	global $kopfPattern;
 	
 	$lineWithoutHead = substr($line, strlen($kopfPattern), strlen($line));
+	return trim($lineWithoutHead);
+	
+	/*
 	$posOfSecondAt = strpos($lineWithoutHead, @"@");
 	$category = substr($lineWithoutHead, 0, $posOfSecondAt);
 	return trim($category);
+	 */
 	
 }
 
@@ -229,25 +237,30 @@ function getDirectoryList($directory, $pattern = '/./')
 
     closedir($handler);
     return $results;
+    
 }
 
 function endsWith($check, $endStr) 
 {
+	
 	if (!is_string($check) || !is_string($endStr) || strlen($check) < strlen($endStr)) {
     	return false;
     }
  
     return (substr($check, strlen($check)-strlen($endStr), strlen($endStr)) === $endStr);
+    
 }
 
 
 function openDB() 
 {
+	
 	global $mysqlHost, $mysqlUser, $mysqlPass, $mysqlDatabase;
 	
 	$dbConn = mysql_connect($mysqlHost, $mysqlUser, $mysqlPass);
 	mysql_select_db($mysqlDatabase, $dbConn);
 	return $dbConn;
+	
 }
 
 function fetchRecord($record, $startDate) 
@@ -292,13 +305,12 @@ function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiff
 	
 	if ($chiffre != false) {
 		$chiffreFields = 'chiffre, chiffre_nr';
-		$chiffreValues = '1, "' . $chiffre . '"';
+		$chiffreValues = '1, "' . str_replace("/", "_", $chiffre) . '"';
 	} else {
 		$chiffreFields = 'chiffre';
 		$chiffreValues = '0';
 	}
 	
-
 	$conn = openDB();
 	$query = 'INSERT INTO ' . $mysqlTable . ' (anz_text, date_start, date_end, rubrik, zeilen, created, '. $issueFields .', ' . $chiffreFields . ' ) VALUES ("' . mysql_escape_string($record) . '", "'.$startDate.'", "'.$endDate.'", ' . $dCategory . ',3, NOW(), ' . $issueValues . ', ' . $chiffreValues . ' );';
 	$result = mysql_query($query);
@@ -306,8 +318,8 @@ function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiff
 	if (!$result) {
     	$message  = 'Ungültige Abfrage: ' . mysql_error() . "\n";
     	$message .= 'Gesamte Abfrage: ' . $query;
-    	die($message);
-	}
+    	die ($message);    	
+   	}
 
 }
 
@@ -332,7 +344,8 @@ function updateRecord($recordId, $dIssue)
 	
 }
 
-function moveProcessedFile($fileName)  {
+function moveProcessedFile($fileName) 
+{
 
 	global $inputDir, $outDir;
 
