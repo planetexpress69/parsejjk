@@ -9,8 +9,8 @@
  * mk
  * 2012-06-12
  *
- * notes: this file must be saved in "Windows Latin 1" encoding to keep
- *
+ * notes: this file must be saved in "Windows Latin 1" encoding 
+ * to keep some weird chars.
  *
  *****************************************************************************/
 
@@ -52,82 +52,81 @@ ALTER TABLE aktuelle_anzeigen AUTO_INCREMENT = 400000;
 
  */
 
-$mysqlHost				= 'localhost';
-$mysqlUser				= 'root';
-$mysqlPass				= '';
-$mysqlDatabase			= 'blitzverlag';
+$mysqlHost			= 'localhost';
+$mysqlUser			= 'root';
+$mysqlPass			= '';
+$mysqlDatabase		= 'blitzverlag';
 $mysqlTable			= 'aktuelle_anzeigen';
 
-$inputDir				= "in";
-$outDir					= "out";
-$expectedNumberOfFiles 	= 8;
+$inDir				= 'in';
+$outDir				= 'out';
+$expectedNoOfFiles	= 8;
 
-$kopfPattern 			= "@Kopf1:";
-$recordPattern			= "@Fliess:";
+$kopfPattern		= "@Kopf1:";
+$recordPattern		= "@Fliess:";
 
-$currentIssue			= "";
-$startDate				= "";
-$currentCategory 		= "";
+$currentIssue		= "";
+$startDate			= "";
+$currentCategory 	= "";
 		
-$issues 				= array (
-							'800'=> '0',
-							'WB' => '1',
-							'SB' => '2',
-							'RB' => '3',
-							'MB' => '4',
-							'VPB'=> '5',
-							'PB' => '6',
-							'VTB'=> '7'
-						);		
+$issues				= array (
+						'800'=> '0',
+						'WB' => '1',
+						'SB' => '2',
+						'RB' => '3',
+						'MB' => '4',
+						'VPB'=> '5',
+						'PB' => '6',
+						'VTB'=> '7'
+					);		
 
-$categories 			= array (
-							'Allgemein' 			=> '',
-							'Immobiliengesuche' 	=> '7',
-							'Immobilienangebote'	=> '20',
-							'Wohnungsgesuche'   	=> '6',
-							'Wohnungsangebote'  	=> '28',
-							'Nachmieter'			=> '33',
-							'Fahrzeugmarkt' 		=> '1',
-							'Wohnwagen' 			=> '39',
-							'Wassersport'   		=> '10',
-							'Verkaufe'  			=> '2',
-							'Verschenke'			=> '27',
-							'Suche' 				=> '3',
-							'Dienstleistungen'  	=> '29',
-							'Stellengesuche'		=> '4',
-							'Stellenangebote'   	=> '25',
-							'Tiermarkt' 			=> '22',
-							'Urlaub'				=> '21',
-							'Geldmarkt' 			=> '34',
-							'Sonstiges' 			=> '11',
-							'Partnerschaft' 		=> '9',
-							'Bars & Clubs'  		=> '23',
-							'Kontakte'  			=> '23'
-						);
+$categories			= array (
+						'Allgemein' 			=> '',
+						'Immobiliengesuche'		=> '7',
+						'Immobilienangebote'	=> '20',
+						'Wohnungsgesuche'		=> '6',
+						'Wohnungsangebote'		=> '28',
+						'Nachmieter'			=> '33',
+						'Fahrzeugmarkt'			=> '1',
+						'Wohnwagen'				=> '39',
+						'Wassersport'			=> '10',
+						'Verkaufe'				=> '2',
+						'Verschenke'			=> '27',
+						'Suche'					=> '3',
+						'Dienstleistungen'		=> '29',
+						'Stellengesuche'		=> '4',
+						'Stellenangebote'		=> '25',
+						'Tiermarkt'				=> '22',
+						'Urlaub'				=> '21',
+						'Geldmarkt'				=> '34',
+						'Sonstiges'				=> '11',
+						'Partnerschaft'			=> '9',
+						'Bars & Clubs'			=> '23',
+						'Kontakte'				=> '23'
+					);
 
 # file name pattern
-$patternFilename		= '#^([^_]+)_AllRub(\d+-\d+-\d+).txt#i';
+$patternFilename	= '#^([^_]+)_AllRub(\d+-\d+-\d+).txt#i';
 
 # chiffre pattern
-$patternChiffre			= '#Chiffre\s(\d+\/\d+)#';
+$patternChiffre		= '#Chiffre\s(\d+\/\d+)#';
 
-$aFilesToProcess		= getDirectoryList($inputDir, $patternFilename);
+$aFilesToProcess	= getDirectoryList($inDir, $patternFilename);
 
-if (count($aFilesToProcess) != $expectedNumberOfFiles) {
-	die ('Would like to see ' . $expectedNumberOfFiles . ' files! Got ' . count($aFilesToProcess) . ' instead... Bailing out... ä²');
+if (count($aFilesToProcess) != $expectedNoOfFiles) {
+	die ('Would like to see ' . $expectedNoOfFiles . ' files! Got ' . count($aFilesToProcess) . ' instead... Bailing out... ä²');
 }
 
 foreach ($aFilesToProcess as $fileName) {
 
-	$splittedFileName 	= explode ('_', $fileName);
+	$currentHead 		= "";
 	
+	$splittedFileName 	= explode ('_', $fileName);
 	$currentIssue 		= $splittedFileName[0];
 	$startDate 			= substr($splittedFileName[1], 6, 10);
 	$endDate   			= date ('Y-m-d', strtotime($startDate) + (7 * 24 * 3600));	
 	
-	$fp = fopen('./'. $inputDir . '/' . $fileName,'r') or die("can't open file");
-	
-	$currentHead 		= "";
+	$fp = fopen('./'. $inDir . '/' . $fileName,'r') or die("can't open file");
 	
 	while($line = fgets($fp,1024)) {
 		
@@ -145,17 +144,6 @@ foreach ($aFilesToProcess as $fileName) {
 			
 			$head = extractHead($line);
 			$currentHead = $head;
-						
-			// chiffre, assuming that there's a record in the same line as the head. not the case when running on a linux box.
-			/*
-			if (preg_match ($patternChiffre,  $line, $hits)) {
-				$chiffre = $hits[1];
-			} else {
-				$chiffre = false;
-			}
-			
-			$record = extractRecord($line);	
-			*/
 								
 		} else if (stristr($line, $recordPattern)) { // this is record
 			
@@ -199,13 +187,7 @@ function extractHead($line)
 	
 	$lineWithoutHead = substr($line, strlen($kopfPattern), strlen($line));
 	return trim($lineWithoutHead);
-	
-	/*
-	$posOfSecondAt = strpos($lineWithoutHead, @"@");
-	$category = substr($lineWithoutHead, 0, $posOfSecondAt);
-	return trim($category);
-	 */
-	
+
 }
 
 /* TODO: get rid of stupidity */
@@ -222,7 +204,7 @@ function extractRecord ($line)
 	} else {
 		return trim(substr($line, strlen($recordPattern), strlen($line)));
 	}
-	
+
 }
 
 
@@ -251,7 +233,7 @@ function endsWith($check, $endStr)
 	}
 
 	return (substr($check, strlen($check)-strlen($endStr), strlen($endStr)) === $endStr);
-	
+
 }
 
 
@@ -263,7 +245,7 @@ function openDB()
 	$dbConn = mysql_connect($mysqlHost, $mysqlUser, $mysqlPass);
 	mysql_select_db($mysqlDatabase, $dbConn);
 	return $dbConn;
-	
+
 }
 
 function fetchRecord($record, $startDate) 
@@ -276,13 +258,13 @@ function fetchRecord($record, $startDate)
 	$conn = openDB();
 	$query = 'SELECT id FROM ' . $mysqlTable . ' WHERE anz_text = "' . mysql_escape_string($record) . '" AND date_start = "' . $startDate . '";';
 	$result = mysql_query($query);
-	
+
 	if (!$result) {
 		$message  = 'Error: ' . mysql_error() . "\n";
 		$message .= 'Query: ' . $query;
 		die($message);
 	}
-		
+
 	while ($row = mysql_fetch_assoc($result)) {
 		$res = $row['id'];
 	}
@@ -322,7 +304,7 @@ function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiff
 		$message  = 'Ungültige Abfrage: ' . mysql_error() . "\n";
 		$message .= 'Gesamte Abfrage: ' . $query;
 		die ($message);		
-   	}
+	}
 
 }
 
@@ -350,10 +332,10 @@ function updateRecord($recordId, $dIssue)
 function moveProcessedFile($fileName) 
 {
 
-	global $inputDir, $outDir;
+	global $inDir, $outDir;
 
-	if (copy('./' . $inputDir . '/'  . $fileName, './' . $outDir . '/'  . $fileName)) {
-		unlink('./' . $inputDir . '/'  . $fileName);
+	if (copy('./' . $inDir . '/'  . $fileName, './' . $outDir . '/'  . $fileName)) {
+		unlink('./' . $inDir . '/'  . $fileName);
 	}
 
 }
