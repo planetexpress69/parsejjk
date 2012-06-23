@@ -10,7 +10,8 @@
  * 2012-06-12
  *
  * notes: this file must be saved in "Windows Latin 1" encoding 
- * to keep some weird chars.
+ * to keep some weird chars for "quadratmeter" or "kubikmeter"!!!!!!!!!!!!!!!
+ * this currently sucks on parsing file w/ mixed line endings!!!!!!!!!!!!!!!!
  *
  *****************************************************************************/
 
@@ -117,8 +118,11 @@ if (count($aFilesToProcess) != $expectedNoOfFiles) {
 	die ('Would like to see ' . $expectedNoOfFiles . ' files! Got ' . count($aFilesToProcess) . ' instead... Bailing out... ä²');
 }
 
-foreach ($aFilesToProcess as $fileName) {
+$insertCount = 0;
+$updateCount = 0;
 
+foreach ($aFilesToProcess as $fileName) {
+	
 	$currentHead 		= "";
 	
 	$splittedFileName 	= explode ('_', $fileName);
@@ -128,7 +132,9 @@ foreach ($aFilesToProcess as $fileName) {
 	
 	$fp = fopen('./'. $inDir . '/' . $fileName,'r') or die("can't open file");
 	
-	while($line = fgets($fp,1024)) {
+	
+	
+	while($line = fgets($fp)) {
 		
 		$line = str_replace ('@Schlag:', '@Fliess:', $line);		# ummm, don't ask!
 		$line = str_replace ('<B>', '', $line);								
@@ -144,6 +150,7 @@ foreach ($aFilesToProcess as $fileName) {
 			
 			$head = extractHead($line);
 			$currentHead = $head;
+			$record = "";
 								
 		} else if (stristr($line, $recordPattern)) { // this is record
 			
@@ -162,14 +169,21 @@ foreach ($aFilesToProcess as $fileName) {
 		}		
 		
 		// conditional insert or update of record
+		
+
+		
+		
 		$previouslyWrittenRecordId = false;
 		$previouslyWrittenRecordId = fetchRecord($record, $startDate);
-		
+				
 		if ($previouslyWrittenRecordId != false) {
 			updateRecord($previouslyWrittenRecordId, $issues[$currentIssue]);
+			$updateCount ++;
 		} else {
-			if ($record != "")
+			if ($record != "") {
 				insertRecord($record, $startDate, $endDate, $issues[$currentIssue], $categories[$currentHead], $chiffre);
+				$insertCount ++;
+			}
 		}
 			
 	}
@@ -178,6 +192,9 @@ foreach ($aFilesToProcess as $fileName) {
 	moveProcessedFile($fileName);
 
 }
+
+
+die ('I just inserted ' . $insertCount .' records and updated ' . $updateCount . ' of them... Bye!');
 
 /* TODO: get rid of stupidity */
 function extractHead($line) 
@@ -303,8 +320,12 @@ function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiff
 	if (!$result) {
 		$message  = 'Ungültige Abfrage: ' . mysql_error() . "\n";
 		$message .= 'Gesamte Abfrage: ' . $query;
+		
+		mysql_close($conn);
 		die ($message);		
 	}
+	
+	mysql_close($conn);
 
 }
 
@@ -324,8 +345,12 @@ function updateRecord($recordId, $dIssue)
 	if (!$result) {
 		$message  = 'Ungültige Abfrage: ' . mysql_error() . "\n";
 		$message .= 'Gesamte Abfrage: ' . $query;
+		
+		mysql_close($conn);
 		die($message);
 	}
+	
+	mysql_close($conn);
 	
 }
 
