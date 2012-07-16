@@ -71,7 +71,7 @@ $startDate			= "";
 $currentCategory 	= "";
 		
 $issues				= array (
-						'800'=> '0',
+						'OB' => '0',
 						'WB' => '1',
 						'SB' => '2',
 						'RB' => '3',
@@ -132,7 +132,8 @@ foreach ($aFilesToProcess as $fileName) {
 	
 	$fp = fopen('./'. $inDir . '/' . $fileName,'r') or die("can't open file");
 	
-	
+	// Read file line-by-line. Line delimiter is either CRLF or LF.
+	// Note that we need to do some extra checks if file's lines are separated by mixed lin endings...
 	
 	while($line = fgets($fp)) {
 		
@@ -150,8 +151,30 @@ foreach ($aFilesToProcess as $fileName) {
 			
 			$head = extractHead($line);
 			$currentHead = $head;
-			$record = "";
-								
+			
+			// Line might contain record, too! 
+			// This happens if file contains mixed line endings and heads are separated from the records just by CR (instead of CRLF or LF).
+			
+			if (stristr($line, $recordPattern)) {
+				
+				// if so, check for chiffre...
+				
+				if (preg_match ($patternChiffre,  $line, $hits)) {
+					$chiffre = $hits[1];
+				} else {
+					$chiffre = false;
+				}
+				
+				// ...and extract record
+				$record = extractRecord($line);
+				
+			} else {
+				
+				// this line contains just heads...
+				$record = "";
+				
+			}
+											
 		} else if (stristr($line, $recordPattern)) { // this is record
 			
 			// extract chiffre
@@ -169,9 +192,6 @@ foreach ($aFilesToProcess as $fileName) {
 		}		
 		
 		// conditional insert or update of record
-		
-
-		
 		
 		$previouslyWrittenRecordId = false;
 		$previouslyWrittenRecordId = fetchRecord($record, $startDate);
@@ -374,7 +394,7 @@ function pase($fileName) {
 	$aR = array ('<$f"Wingdings">(' => 'W', '<$f"Wingdings">*' => 'Eur'); # Ersetzungstabelle fuer die Fluegel
 	$sD = strip_tags (str_replace (array_keys ($aR), array_values ($aR), file_get_contents ($sF))); # Datei laden und filtern
 	$aC = preg_split ('/@Kopf1:/si', $sD, NULL, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY); # Daten in Bloecke aufsplitten
- 
+
 	foreach ($aC as $sC) { # alle Bloecke abarbeiten
 		preg_match ('/^(.+)\s+(.+)$/Usi', $sC, $aX); # Kategorie-Titel und Rest aus Block holen
 		preg_match_all ('/\@Fliess\:(.+)/i', $aX[2], $aI); # aus Rest die Elemente ermitteln
