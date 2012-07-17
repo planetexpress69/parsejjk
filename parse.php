@@ -17,171 +17,171 @@
  *****************************************************************************/
 
 
-$mysqlHost			= 'localhost';
-$mysqlUser			= 'root';
-$mysqlPass			= '';
-$mysqlDatabase		= 'blitzverlag';
-$mysqlTable			= 'aktuelle_anzeigen';
+$mysqlHost              = 'localhost';
+$mysqlUser              = 'root';
+$mysqlPass              = '';
+$mysqlDatabase          = 'blitzverlag';
+$mysqlTable             = 'aktuelle_anzeigen';
 
-$inDir				= 'in';
-$outDir				= 'out';
-$expectedNoOfFiles	= 8;
+$inDir                  = 'in';
+$outDir                 = 'out';
+$expectedNoOfFiles      = 8;
 
-$kopfPattern		= "@Kopf1:";
-$recordPattern		= "@Fliess:";
+$kopfPattern            = "@Kopf1:";
+$recordPattern          = "@Fliess:";
 
-$currentIssue		= "";
-$startDate			= "";
-$currentCategory 	= "";
-		
-$issues				= array (
-						'OB' => '0',
-						'WB' => '1',
-						'SB' => '2',
-						'RB' => '3',
-						'MB' => '4',
-						'VPB'=> '5',
-						'PB' => '6',
-						'VTB'=> '7'
-					);		
+$currentIssue           = "";
+$startDate              = "";
+$currentCategory        = "";
+        
+$issues = array (
+    'OB' => '0',
+    'WB' => '1',
+    'SB' => '2',
+    'RB' => '3',
+    'MB' => '4',
+    'VPB'=> '5',
+    'PB' => '6',
+    'VTB'=> '7'
+);
 
-$categories			= array (
-						'Allgemein' 			=> '',
-						'Immobiliengesuche'		=> '7',
-						'Immobilienangebote'	=> '20',
-						'Wohnungsgesuche'		=> '6',
-						'Wohnungsangebote'		=> '28',
-						'Nachmieter'			=> '33',
-						'Fahrzeugmarkt'			=> '1',
-						'Wohnwagen'				=> '39',
-						'Wassersport'			=> '10',
-						'Verkaufe'				=> '2',
-						'Verschenke'			=> '27',
-						'Suche'					=> '3',
-						'Dienstleistungen'		=> '29',
-						'Stellengesuche'		=> '4',
-						'Stellenangebote'		=> '25',
-						'Tiermarkt'				=> '22',
-						'Urlaub'				=> '21',
-						'Geldmarkt'				=> '34',
-						'Sonstiges'				=> '11',
-						'Partnerschaft'			=> '9',
-						'Bars & Clubs'			=> '23',
-						'Kontakte'				=> '23'
-					);
+$categories = array (
+    'Allgemein'         => '',
+    'Immobiliengesuche' => '7',
+    'Immobilienangebote'=> '20',
+    'Wohnungsgesuche'   => '6',
+    'Wohnungsangebote'  => '28',
+    'Nachmieter'        => '33',
+    'Fahrzeugmarkt'     => '1',
+    'Wohnwagen'         => '39',
+    'Wassersport'       => '10',
+    'Verkaufe'          => '2',
+    'Verschenke'        => '27',
+    'Suche'             => '3',
+    'Dienstleistungen'  => '29',
+    'Stellengesuche'    => '4',
+    'Stellenangebote'   => '25',
+    'Tiermarkt'         => '22',
+    'Urlaub'            => '21',
+    'Geldmarkt'         => '34',
+    'Sonstiges'         => '11',
+    'Partnerschaft'     => '9',
+    'Bars & Clubs'      => '23',
+    'Kontakte'          => '23'
+);
 
 # file name pattern
-$patternFilename	= '#^([^_]+)_AllRub(\d+).TXT#i';
+$patternFilename        = '#^([^_]+)_AllRub(\d+).TXT#i';
 
 # chiffre pattern
-$patternChiffre		= '#Chiffre\s(\d+\/\d+)#';
+$patternChiffre         = '#Chiffre\s(\d+\/\d+)#';
 
-$aFilesToProcess	= getDirectoryList($inDir, $patternFilename);
+$aFilesToProcess        = getDirectoryList($inDir, $patternFilename);
 
 if (count($aFilesToProcess) != $expectedNoOfFiles) {
-	die ('Would like to see ' . $expectedNoOfFiles . ' files! Got ' . count($aFilesToProcess) . ' instead... Bailing out... ä²');
+    die ('Would like to see ' . $expectedNoOfFiles . ' files! Got ' . count($aFilesToProcess) . ' instead... Bailing out... ä²');
 }
 
-$insertCount = 0;
-$updateCount = 0;
+$insertCount            = 0;
+$updateCount            = 0;
 
 openDB();
 
 foreach ($aFilesToProcess as $fileName) {
-	
-	$currentHead 		= "";
-	
-	$splittedFileName 	= explode ('_', $fileName);
-	$currentIssue 		= $splittedFileName[0];
-	
-	/****************************************************************************/
-	$currentYear       = date("Y"); // this is so weak!!!! 
-	// consider the end of a year parsing files for the 1st calendar week 
-	// of the next year!!!!!
-	/****************************************************************************/
-	$weekOfYear        = substr($splittedFileName[1], 6,2) ;
-	$startDate         = startDate($currentYear, $weekOfYear);
-	$endDate           = date ('Y-m-d', strtotime($startDate) + (7 * 24 * 3600));
-	
-	echo ("Processing file '".$fileName."' from '" . $startDate . "' to '" . $endDate . "'...<br />");	
-	
-	$fp = fopen('./'. $inDir . '/' . $fileName,'r') or die("can't open file");
-		
-	while($line = fgets($fp)) {
-		
-		$line = str_replace ('@Schlag:', '@Fliess:', $line);		# ummm, don't ask!
-		$line = str_replace ('<B>', '', $line);					    # crappy bold tag			
-		$line = str_replace ('<$f"Arial">', '', $line);				# strange font defs
-		$line = str_replace ('<$f"Wingdings">(', ' Tel. ', $line); 	# phone symbol
-		$line = str_replace ('<$f"Wingdings">*', ' ', $line);		# letter symbol
-		$line = str_replace ('<\@>', '@', $line);					# @ in email addresses...
-		$line = str_replace ('<+>2<+>', '²', $line);                # quadratmeters
-		$line = str_replace ('<+>3<+>', '³', $line);		        # cubicmeters
-		$line = str_replace ('  ', ' ', $line);		                # get rid of double blanks
-				
-		if (stristr($line, $kopfPattern)) { // this is head
-			
-			$head = extractHead($line);
-			$currentHead = $head;
-			
-			// Look if there's more stuff (aka record). 
-			// This happens if the heads are separated from the records just by CR (instead of CRLF or LF).
-			
-			if (stristr($line, $recordPattern)) {
-				
-				// if so, check for chiffre...
-				
-				if (preg_match ($patternChiffre,  $line, $hits)) {
-					$chiffre = $hits[1];
-				} else {
-					$chiffre = false;
-				}
-				
-				// ...and extract record
-				$record = extractRecord($line);
-				
-			} else {
-				
-				// this line contains just heads...
-				$record = "";
-				
-			}
-											
-		} else if (stristr($line, $recordPattern)) { // this is record
-			
-			// extract chiffre
-			if (preg_match ($patternChiffre,  $line, $hits)) {
-				$chiffre = $hits[1];
-			} else {
-				$chiffre = false;
-			}
-			
-			// ectract record from line
-			$record = extractRecord($line);
+    
+    $currentHead        = "";
+    
+    $splittedFileName   = explode ('_', $fileName);
+    $currentIssue       = $splittedFileName[0];
+    
+    /****************************************************************************/
+    $currentYear        = date("Y"); // this is so weak!!!! 
+    // consider the end of a year parsing files for the 1st calendar week 
+    // of the next year!!!!!
+    /****************************************************************************/
+    $weekOfYear         = substr($splittedFileName[1], 6,2) ;
+    $startDate          = startDate($currentYear, $weekOfYear);
+    $endDate            = date ('Y-m-d', strtotime($startDate) + (7 * 24 * 3600));
+    
+    echo ("Processing file '" . $fileName . "' from '" . $startDate . "' to '" . $endDate . "'...<br />");    
+    
+    $fp = fopen('./'. $inDir . '/' . $fileName,'r') or die("can't open file");
+    
+    while($line = fgets($fp)) {
+    
+        $line = str_replace ('@Schlag:', '@Fliess:', $line);        # ummm, don't ask!
+        $line = str_replace ('<B>', '', $line);                     # crappy bold tag            
+        $line = str_replace ('<$f"Arial">', '', $line);             # strange font defs
+        $line = str_replace ('<$f"Wingdings">(', ' Tel. ', $line);  # phone symbol
+        $line = str_replace ('<$f"Wingdings">*', ' ', $line);       # letter symbol
+        $line = str_replace ('<\@>', '@', $line);                   # @ in email addresses...
+        $line = str_replace ('<+>2<+>', '²', $line);                # quadratmeters
+        $line = str_replace ('<+>3<+>', '³', $line);                # cubicmeters
+        $line = str_replace ('  ', ' ', $line);                     # get rid of double blanks
+        
+        if (stristr($line, $kopfPattern)) { // this is head
+            
+            $head = extractHead($line);
+            $currentHead = $head;
+            
+            // Look if there's more stuff (aka record). 
+            // This happens if the heads are separated from the records just by CR (instead of CRLF or LF).
+            
+            if (stristr($line, $recordPattern)) {
+                
+                // if so, check for chiffre...
+                
+                if (preg_match ($patternChiffre,  $line, $hits)) {
+                    $chiffre = $hits[1];
+                } else {
+                    $chiffre = false;
+                }
+                
+                // ...and extract record
+                $record = extractRecord($line);
+                
+            } else {
+                
+                // this line contains just heads...
+                $record = "";
+                
+            }
+                                            
+        } else if (stristr($line, $recordPattern)) { // this is record
+            
+            // extract chiffre
+            if (preg_match ($patternChiffre,  $line, $hits)) {
+                $chiffre = $hits[1];
+            } else {
+                $chiffre = false;
+            }
+            
+            // ectract record from line
+            $record = extractRecord($line);
 
-		} else {
-			die ("Error!!! Looks like the line is somewhat garbled...<br />" . $line);
-		}		
-		
-		// conditional insert or update of record
-		
-		$previouslyWrittenRecordId = false;
-		$previouslyWrittenRecordId = fetchRecord($record, $startDate);
-				
-		if ($previouslyWrittenRecordId != false) {
-			updateRecord($previouslyWrittenRecordId, $issues[$currentIssue]);
-			$updateCount ++;
-		} else {
-			if ($record != "") {
-				insertRecord($record, $startDate, $endDate, $issues[$currentIssue], $categories[$currentHead], $chiffre);
-				$insertCount ++;
-			}
-		}
-			
-	}
-	
-	// we're done. move file out of the folder...
-	moveProcessedFile($fileName);
+        } else {
+            die ("Error!!! Looks like the line is somewhat garbled...<br />" . $line);
+        }        
+        
+        // conditional insert or update of record
+        
+        $previouslyWrittenRecordId = false;
+        $previouslyWrittenRecordId = fetchRecord($record, $startDate);
+                
+        if ($previouslyWrittenRecordId != false) {
+            updateRecord($previouslyWrittenRecordId, $issues[$currentIssue]);
+            $updateCount ++;
+        } else {
+            if ($record != "") {
+                insertRecord($record, $startDate, $endDate, $issues[$currentIssue], $categories[$currentHead], $chiffre);
+                $insertCount ++;
+            }
+        }
+            
+    }
+    
+    // we're done. move file out of the folder...
+    moveProcessedFile($fileName);
 
 }
 
@@ -197,8 +197,8 @@ mysql_close();
  ****************************************************************************/
 function extractHead($line) 
 {
-	global $kopfPattern;
-    		
+    global $kopfPattern;
+            
     $lineWithoutHead = substr($line, strlen($kopfPattern), strlen($line));    
     $posOfSecondAt = strpos($lineWithoutHead, @"@");
     
@@ -208,11 +208,11 @@ function extractHead($line)
     
     } else {
     
-        $category = trim(substr($lineWithoutHead, 0, $posOfSecondAt));	
-	
-	}
-	
-	return $category;
+        $category = trim(substr($lineWithoutHead, 0, $posOfSecondAt));    
+    
+    }
+    
+    return $category;
 
 }
 
@@ -224,17 +224,17 @@ function extractHead($line)
  ****************************************************************************/
 function extractRecord ($line) 
 {
-	
-	global $kopfPattern;
-	global $recordPattern;
-	
-	if (substr($line, 1,1) == "K") {
-		$lineWithoutHead = substr($line, strlen($kopfPattern), strlen($line));
-		$parts = explode($recordPattern, $lineWithoutHead);
-		return trim($parts[1]);
-	} else {
-		return trim(substr($line, strlen($recordPattern), strlen($line)));
-	}
+    
+    global $kopfPattern;
+    global $recordPattern;
+    
+    if (substr($line, 1,1) == "K") {
+        $lineWithoutHead = substr($line, strlen($kopfPattern), strlen($line));
+        $parts = explode($recordPattern, $lineWithoutHead);
+        return trim($parts[1]);
+    } else {
+        return trim(substr($line, strlen($recordPattern), strlen($line)));
+    }
 
 }
 
@@ -246,17 +246,17 @@ function extractRecord ($line)
  ****************************************************************************/
 function getDirectoryList($directory, $pattern = '/./') 
 {
-	$results = array();
-	$handler = opendir($directory);
+    $results = array();
+    $handler = opendir($directory);
 
-	while ($fileName = readdir($handler)) {
-		if(preg_match ($pattern,  $fileName, $hits)) {
-			$results[] = $fileName;
-		}
-	}
+    while ($fileName = readdir($handler)) {
+        if(preg_match ($pattern,  $fileName, $hits)) {
+            $results[] = $fileName;
+        }
+    }
 
-	closedir($handler);
-	return $results;
+    closedir($handler);
+    return $results;
 
 }
 
@@ -268,13 +268,12 @@ function getDirectoryList($directory, $pattern = '/./')
  ****************************************************************************/
 function openDB() 
 {
-	
-	global $mysqlHost, $mysqlUser, $mysqlPass, $mysqlDatabase;
-	
-	$dbConn = mysql_connect($mysqlHost, $mysqlUser, $mysqlPass);
-	mysql_select_db($mysqlDatabase, $dbConn);
-	//return $dbConn;
-
+    
+    global $mysqlHost, $mysqlUser, $mysqlPass, $mysqlDatabase;
+    
+    $dbConn = mysql_connect($mysqlHost, $mysqlUser, $mysqlPass);
+    mysql_select_db($mysqlDatabase, $dbConn);
+    
 }
 
 /****************************************************************************
@@ -286,24 +285,24 @@ function openDB()
 function fetchRecord($record, $startDate) 
 {
 
-	global $mysqlTable;		
+    global $mysqlTable;        
 
-	$res = false;
+    $res = false;
 
-	$query = 'SELECT id FROM ' . $mysqlTable . ' WHERE anz_text = "' . mysql_escape_string($record) . '" AND date_start = "' . $startDate . '";';
-	$result = mysql_query($query);
+    $query = 'SELECT id FROM ' . $mysqlTable . ' WHERE anz_text = "' . mysql_escape_string($record) . '" AND date_start = "' . $startDate . '";';
+    $result = mysql_query($query);
 
-	if (!$result) {
-		$message  = 'Error: ' . mysql_error() . "\n";
-		$message .= 'Query: ' . $query;
-		die($message);
-	}
+    if (!$result) {
+        $message  = 'Error: ' . mysql_error() . "\n";
+        $message .= 'Query: ' . $query;
+        die($message);
+    }
 
-	while ($row = mysql_fetch_assoc($result)) {
-		$res = $row['id'];
-	}
-		
-	return $res;
+    while ($row = mysql_fetch_assoc($result)) {
+        $res = $row['id'];
+    }
+        
+    return $res;
 
 }
 
@@ -316,33 +315,33 @@ function fetchRecord($record, $startDate)
 function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiffre) 
 {
 
-	global $mysqlTable;
+    global $mysqlTable;
 
-	if ($dIssue == 0) {
-		$issueFields = 'verlag_id1, verlag_id2, verlag_id3, verlag_id4, verlag_id5, verlag_id6, verlag_id7';
-		$issueValues = '1, 1, 1, 1, 1, 1, 1';
-	} else {
-		$issueFields = 'verlag_id'.$dIssue;
-		$issueValues = '1';
-	}
-	
-	if ($chiffre != false) {
-		$chiffreFields = 'chiffre, chiffre_nr';
-		$chiffreValues = '1, "' . str_replace("/", "_", $chiffre) . '"';
-	} else {
-		$chiffreFields = 'chiffre';
-		$chiffreValues = '0';
-	}
-	
-	$query = 'INSERT INTO ' . $mysqlTable . ' (anz_text, date_start, date_end, rubrik, zeilen, created, '. $issueFields .', ' . $chiffreFields . ' ) VALUES ("' . mysql_escape_string($record) . '", "'.$startDate.'", "'.$endDate.'", ' . $dCategory . ',3, NOW(), ' . $issueValues . ', ' . $chiffreValues . ' );';
-	$result = mysql_query($query);
-	
-	if (!$result) {
-		$message  = 'Booom! ' . mysql_error() . "\n";
-		$message .= 'Query: ' . $query;
-		die ($message);		
-	}
-	
+    if ($dIssue == 0) {
+        $issueFields = 'verlag_id1, verlag_id2, verlag_id3, verlag_id4, verlag_id5, verlag_id6, verlag_id7';
+        $issueValues = '1, 1, 1, 1, 1, 1, 1';
+    } else {
+        $issueFields = 'verlag_id'.$dIssue;
+        $issueValues = '1';
+    }
+    
+    if ($chiffre != false) {
+        $chiffreFields = 'chiffre, chiffre_nr';
+        $chiffreValues = '1, "' . str_replace("/", "_", $chiffre) . '"';
+    } else {
+        $chiffreFields = 'chiffre';
+        $chiffreValues = '0';
+    }
+    
+    $query = 'INSERT INTO ' . $mysqlTable . ' (anz_text, date_start, date_end, rubrik, zeilen, created, '. $issueFields .', ' . $chiffreFields . ' ) VALUES ("' . mysql_escape_string($record) . '", "'.$startDate.'", "'.$endDate.'", ' . $dCategory . ',3, NOW(), ' . $issueValues . ', ' . $chiffreValues . ' );';
+    $result = mysql_query($query);
+    
+    if (!$result) {
+        $message  = 'Booom! ' . mysql_error() . "\n";
+        $message .= 'Query: ' . $query;
+        die ($message);        
+    }
+    
 
 }
 
@@ -355,22 +354,22 @@ function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiff
 function updateRecord($recordId, $dIssue) 
 {
 
-	if ($dIssue == 0) {
-		return;
-	}
+    if ($dIssue == 0) {
+        return;
+    }
 
-	global $mysqlTable;
+    global $mysqlTable;
 
-	$query = 'UPDATE ' . $mysqlTable . ' SET verlag_id'.$dIssue.' = 1 WHERE id = ' . $recordId;
-	$result = mysql_query($query);
-	
-	if (!$result) {
-		$message  = 'Booom! ' . mysql_error() . "\n";
-		$message .= 'Query: ' . $query;		
-		die($message);
-	}
-	
-	
+    $query = 'UPDATE ' . $mysqlTable . ' SET verlag_id'.$dIssue.' = 1 WHERE id = ' . $recordId;
+    $result = mysql_query($query);
+    
+    if (!$result) {
+        $message  = 'Booom! ' . mysql_error() . "\n";
+        $message .= 'Query: ' . $query;        
+        die($message);
+    }
+    
+    
 }
 
 /****************************************************************************
@@ -382,11 +381,11 @@ function updateRecord($recordId, $dIssue)
 function moveProcessedFile($fileName) 
 {
 
-	global $inDir, $outDir;
+    global $inDir, $outDir;
 
-	if (copy('./' . $inDir . '/'  . $fileName, './' . $outDir . '/'  . $fileName)) {
-		unlink('./' . $inDir . '/'  . $fileName);
-	}
+    if (copy('./' . $inDir . '/'  . $fileName, './' . $outDir . '/'  . $fileName)) {
+        unlink('./' . $inDir . '/'  . $fileName);
+    }
 
 }
 
@@ -409,16 +408,16 @@ function startDate($year, $week)
 look at this amazing attempt of the incredible eidberger ---
 
 function pase($fileName) {
-	$sF = $fileName; # Dateiname
-	$aR = array ('<$f"Wingdings">(' => 'W', '<$f"Wingdings">*' => 'Eur'); # Ersetzungstabelle fuer die Fluegel
-	$sD = strip_tags (str_replace (array_keys ($aR), array_values ($aR), file_get_contents ($sF))); # Datei laden und filtern
-	$aC = preg_split ('/@Kopf1:/si', $sD, NULL, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY); # Daten in Bloecke aufsplitten
+    $sF = $fileName; # Dateiname
+    $aR = array ('<$f"Wingdings">(' => 'W', '<$f"Wingdings">*' => 'Eur'); # Ersetzungstabelle fuer die Fluegel
+    $sD = strip_tags (str_replace (array_keys ($aR), array_values ($aR), file_get_contents ($sF))); # Datei laden und filtern
+    $aC = preg_split ('/@Kopf1:/si', $sD, NULL, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY); # Daten in Bloecke aufsplitten
 
-	foreach ($aC as $sC) { # alle Bloecke abarbeiten
-		preg_match ('/^(.+)\s+(.+)$/Usi', $sC, $aX); # Kategorie-Titel und Rest aus Block holen
-		preg_match_all ('/\@Fliess\:(.+)/i', $aX[2], $aI); # aus Rest die Elemente ermitteln
-		var_dump (array ('title' => $aX[1], 'items' => $aI[1])); # Ausgabe
-	}
+    foreach ($aC as $sC) { # alle Bloecke abarbeiten
+        preg_match ('/^(.+)\s+(.+)$/Usi', $sC, $aX); # Kategorie-Titel und Rest aus Block holen
+        preg_match_all ('/\@Fliess\:(.+)/i', $aX[2], $aI); # aus Rest die Elemente ermitteln
+        var_dump (array ('title' => $aX[1], 'items' => $aI[1])); # Ausgabe
+    }
 }
 */
 
