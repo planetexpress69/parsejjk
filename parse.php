@@ -12,46 +12,10 @@
  * notes: this file must be saved in "Windows Latin 1" encoding 
  * to keep some weird chars for "quadratmeter" or "kubikmeter"!!!!!!!!!!!!!!!
  * this currently sucks on parsing file w/ mixed line endings!!!!!!!!!!!!!!!!
- *
+ * 
+ * determining a date from calendar week relies on a given year!!!!!!!!!!!!!!
  *****************************************************************************/
 
-/*
-CREATE DATABASE test;
-CREATE TABLE `aktuelle_anzeigen` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `anzeigen_typ` tinyint(1) NOT NULL default '0',
-  `rubrik` int(10) NOT NULL default '0',
-  `anz_text` text NOT NULL,
-  `zeilen` int(10) unsigned NOT NULL default '0',
-  `date_start` date NOT NULL default '0000-00-00',
-  `date_end` date NOT NULL default '0000-00-00',
-  `chiffre` varchar(10) NOT NULL default '',
-  `chiffre_nr` varchar(20) NOT NULL default '',
-  `verlag_id1` int(1) NOT NULL default '0',
-  `verlag_id2` int(1) NOT NULL default '0',
-  `verlag_id3` int(1) NOT NULL default '0',
-  `verlag_id4` int(1) NOT NULL default '0',
-  `verlag_id5` int(1) NOT NULL default '0',
-  `verlag_id6` int(1) NOT NULL default '0',
-  `verlag_id7` int(1) NOT NULL default '0',
-  `layout` char(1) NOT NULL default '0',
-  `bilder` char(1) NOT NULL default '0',
-  `kunden_id` int(14) NOT NULL default '0',
-  `created` datetime NOT NULL default '1970-01-01 00:00:00',
-  `created_in` smallint(5) unsigned NOT NULL default '0',
-  `datum` datetime NOT NULL default '0000-00-00 00:00:00',
-  `access` timestamp(14) NOT NULL,
-  PRIMARY KEY  (`id`),
-  UNIQUE KEY `id` (`id`),
-  KEY `chiffre_nr` (`chiffre_nr`),
-  KEY `kunden_id` (`kunden_id`),
-  KEY `verlag_id5` (`verlag_id5`),
-  FULLTEXT KEY `anz_text` (`anz_text`)
-) TYPE=MyISAM;
-
-ALTER TABLE aktuelle_anzeigen AUTO_INCREMENT = 400000;
-
- */
 
 $mysqlHost			= 'localhost';
 $mysqlUser			= 'root';
@@ -107,7 +71,7 @@ $categories			= array (
 					);
 
 # file name pattern
-$patternFilename	= '#^([^_]+)_AllRub(\d+-\d+-\d+).txt#i';
+$patternFilename	= '#^([^_]+)_AllRub(\d+).TXT#i';
 
 # chiffre pattern
 $patternChiffre		= '#Chiffre\s(\d+\/\d+)#';
@@ -121,39 +85,47 @@ if (count($aFilesToProcess) != $expectedNoOfFiles) {
 $insertCount = 0;
 $updateCount = 0;
 
+openDB();
+
 foreach ($aFilesToProcess as $fileName) {
 	
 	$currentHead 		= "";
 	
 	$splittedFileName 	= explode ('_', $fileName);
 	$currentIssue 		= $splittedFileName[0];
-	$startDate 			= substr($splittedFileName[1], 6, 10);
-	$endDate   			= date ('Y-m-d', strtotime($startDate) + (7 * 24 * 3600));	
+	
+	/****************************************************************************/
+	$currentYear       = date("Y"); // this is so weak!!!! 
+	// consider the end of a year parsing files for the 1st calendar week 
+	// of the next year!!!!!
+	/****************************************************************************/
+	$weekOfYear        = substr($splittedFileName[1], 6,2) ;
+	$startDate         = startDate($currentYear, $weekOfYear);
+	$endDate           = date ('Y-m-d', strtotime($startDate) + (7 * 24 * 3600));
+	
+	echo ("Processing file '".$fileName."' from '" . $startDate . "' to '" . $endDate . "'...<br />");	
 	
 	$fp = fopen('./'. $inDir . '/' . $fileName,'r') or die("can't open file");
-	
-	// Read file line-by-line. Line delimiter is either CRLF or LF.
-	// Note that we need to do some extra checks if file's lines are separated by mixed lin endings...
-	
+		
 	while($line = fgets($fp)) {
 		
 		$line = str_replace ('@Schlag:', '@Fliess:', $line);		# ummm, don't ask!
-		$line = str_replace ('<B>', '', $line);								
+		$line = str_replace ('<B>', '', $line);					    # crappy bold tag			
 		$line = str_replace ('<$f"Arial">', '', $line);				# strange font defs
 		$line = str_replace ('<$f"Wingdings">(', ' Tel. ', $line); 	# phone symbol
 		$line = str_replace ('<$f"Wingdings">*', ' ', $line);		# letter symbol
 		$line = str_replace ('<\@>', '@', $line);					# @ in email addresses...
-		$line = str_replace ('<+>2<+>', '²', $line);
-		$line = str_replace ('<+>3<+>', '³', $line);		
-		$line = str_replace ('  ', ' ', $line);		
+		$line = str_replace ('<+>2<+>', '²', $line);                # quadratmeters
+		$line = str_replace ('<+>3<+>', '³', $line);		        # cubicmeters
+		$line = str_replace ('  ', ' ', $line);		                # get rid of double blanks
 				
 		if (stristr($line, $kopfPattern)) { // this is head
 			
 			$head = extractHead($line);
 			$currentHead = $head;
 			
-			// Line might contain record, too! 
-			// This happens if file contains mixed line endings and heads are separated from the records just by CR (instead of CRLF or LF).
+			// Look if there's more stuff (aka record). 
+			// This happens if the heads are separated from the records just by CR (instead of CRLF or LF).
 			
 			if (stristr($line, $recordPattern)) {
 				
@@ -215,19 +187,41 @@ foreach ($aFilesToProcess as $fileName) {
 
 
 die ('I just inserted ' . $insertCount .' records and updated ' . $updateCount . ' of them... Bye!');
+mysql_close();
 
-/* TODO: get rid of stupidity */
+/****************************************************************************
+ * extracts category from a given line
+ *
+ *
+ *
+ ****************************************************************************/
 function extractHead($line) 
 {
-	
 	global $kopfPattern;
+    		
+    $lineWithoutHead = substr($line, strlen($kopfPattern), strlen($line));    
+    $posOfSecondAt = strpos($lineWithoutHead, @"@");
+    
+    if ($posOfSecondAt == FALSE) {
+    
+        $category = trim($lineWithoutHead);
+    
+    } else {
+    
+        $category = trim(substr($lineWithoutHead, 0, $posOfSecondAt));	
 	
-	$lineWithoutHead = substr($line, strlen($kopfPattern), strlen($line));
-	return trim($lineWithoutHead);
+	}
+	
+	return $category;
 
 }
 
-/* TODO: get rid of stupidity */
+/****************************************************************************
+ * extracts actual record from a given line
+ *
+ *
+ *
+ ****************************************************************************/
 function extractRecord ($line) 
 {
 	
@@ -244,10 +238,14 @@ function extractRecord ($line)
 
 }
 
-
+/****************************************************************************
+ * builds array of files (w/ names matching a pattern) in a given diretory.
+ *
+ *
+ *
+ ****************************************************************************/
 function getDirectoryList($directory, $pattern = '/./') 
 {
-
 	$results = array();
 	$handler = opendir($directory);
 
@@ -262,18 +260,12 @@ function getDirectoryList($directory, $pattern = '/./')
 
 }
 
-function endsWith($check, $endStr) 
-{
-	
-	if (!is_string($check) || !is_string($endStr) || strlen($check) < strlen($endStr)) {
-		return false;
-	}
-
-	return (substr($check, strlen($check)-strlen($endStr), strlen($endStr)) === $endStr);
-
-}
-
-
+/****************************************************************************
+ * opens connection to database.
+ *
+ *
+ *
+ ****************************************************************************/
 function openDB() 
 {
 	
@@ -281,10 +273,16 @@ function openDB()
 	
 	$dbConn = mysql_connect($mysqlHost, $mysqlUser, $mysqlPass);
 	mysql_select_db($mysqlDatabase, $dbConn);
-	return $dbConn;
+	//return $dbConn;
 
 }
 
+/****************************************************************************
+ * fetches a particular record's id from db.
+ * returns false if record does not exists.
+ *
+ *
+ ****************************************************************************/
 function fetchRecord($record, $startDate) 
 {
 
@@ -292,7 +290,6 @@ function fetchRecord($record, $startDate)
 
 	$res = false;
 
-	$conn = openDB();
 	$query = 'SELECT id FROM ' . $mysqlTable . ' WHERE anz_text = "' . mysql_escape_string($record) . '" AND date_start = "' . $startDate . '";';
 	$result = mysql_query($query);
 
@@ -305,13 +302,17 @@ function fetchRecord($record, $startDate)
 	while ($row = mysql_fetch_assoc($result)) {
 		$res = $row['id'];
 	}
-	
-	mysql_close($conn);
-	
+		
 	return $res;
 
 }
 
+/****************************************************************************
+ * insterts a record to db.
+ *
+ *
+ *
+ ****************************************************************************/
 function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiffre) 
 {
 
@@ -333,22 +334,24 @@ function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiff
 		$chiffreValues = '0';
 	}
 	
-	$conn = openDB();
 	$query = 'INSERT INTO ' . $mysqlTable . ' (anz_text, date_start, date_end, rubrik, zeilen, created, '. $issueFields .', ' . $chiffreFields . ' ) VALUES ("' . mysql_escape_string($record) . '", "'.$startDate.'", "'.$endDate.'", ' . $dCategory . ',3, NOW(), ' . $issueValues . ', ' . $chiffreValues . ' );';
 	$result = mysql_query($query);
 	
 	if (!$result) {
-		$message  = 'Ungültige Abfrage: ' . mysql_error() . "\n";
-		$message .= 'Gesamte Abfrage: ' . $query;
-		
-		mysql_close($conn);
+		$message  = 'Booom! ' . mysql_error() . "\n";
+		$message .= 'Query: ' . $query;
 		die ($message);		
 	}
 	
-	mysql_close($conn);
 
 }
 
+/****************************************************************************
+ * iupdates a record in db.
+ *
+ *
+ *
+ ****************************************************************************/
 function updateRecord($recordId, $dIssue) 
 {
 
@@ -358,22 +361,24 @@ function updateRecord($recordId, $dIssue)
 
 	global $mysqlTable;
 
-	$conn = openDB();
 	$query = 'UPDATE ' . $mysqlTable . ' SET verlag_id'.$dIssue.' = 1 WHERE id = ' . $recordId;
 	$result = mysql_query($query);
 	
 	if (!$result) {
-		$message  = 'Ungültige Abfrage: ' . mysql_error() . "\n";
-		$message .= 'Gesamte Abfrage: ' . $query;
-		
-		mysql_close($conn);
+		$message  = 'Booom! ' . mysql_error() . "\n";
+		$message .= 'Query: ' . $query;		
 		die($message);
 	}
 	
-	mysql_close($conn);
 	
 }
 
+/****************************************************************************
+ * moves a file from one diretory to another.
+ *
+ *
+ *
+ ****************************************************************************/
 function moveProcessedFile($fileName) 
 {
 
@@ -384,6 +389,20 @@ function moveProcessedFile($fileName)
 	}
 
 }
+
+/****************************************************************************
+ * determines the date of the first sunday from a given calendar week number
+ * and a year.
+ *
+ *
+ ****************************************************************************/
+function startDate($year, $week) 
+{ 
+    $firstCalendarWeek = mktime(0,0,0,1,4,$year); // 4th of January is in calendar week #1 for sure!
+    $monday = $firstCalendarWeek + 86400 * (7 * ($week-1)  - date('w', $firstCalendarWeek) + 1);
+    $sunday = $monday + 86400 * 6;
+    return date('Y-m-d', $sunday);
+}  
 
 /*
 
@@ -402,6 +421,45 @@ function pase($fileName) {
 	}
 }
 */
+
+/*
+CREATE DATABASE test;
+CREATE TABLE `aktuelle_anzeigen` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `anzeigen_typ` tinyint(1) NOT NULL default '0',
+  `rubrik` int(10) NOT NULL default '0',
+  `anz_text` text NOT NULL,
+  `zeilen` int(10) unsigned NOT NULL default '0',
+  `date_start` date NOT NULL default '0000-00-00',
+  `date_end` date NOT NULL default '0000-00-00',
+  `chiffre` varchar(10) NOT NULL default '',
+  `chiffre_nr` varchar(20) NOT NULL default '',
+  `verlag_id1` int(1) NOT NULL default '0',
+  `verlag_id2` int(1) NOT NULL default '0',
+  `verlag_id3` int(1) NOT NULL default '0',
+  `verlag_id4` int(1) NOT NULL default '0',
+  `verlag_id5` int(1) NOT NULL default '0',
+  `verlag_id6` int(1) NOT NULL default '0',
+  `verlag_id7` int(1) NOT NULL default '0',
+  `layout` char(1) NOT NULL default '0',
+  `bilder` char(1) NOT NULL default '0',
+  `kunden_id` int(14) NOT NULL default '0',
+  `created` datetime NOT NULL default '1970-01-01 00:00:00',
+  `created_in` smallint(5) unsigned NOT NULL default '0',
+  `datum` datetime NOT NULL default '0000-00-00 00:00:00',
+  `access` timestamp(14) NOT NULL,
+  PRIMARY KEY  (`id`),
+  UNIQUE KEY `id` (`id`),
+  KEY `chiffre_nr` (`chiffre_nr`),
+  KEY `kunden_id` (`kunden_id`),
+  KEY `verlag_id5` (`verlag_id5`),
+  FULLTEXT KEY `anz_text` (`anz_text`)
+) TYPE=MyISAM;
+
+ALTER TABLE aktuelle_anzeigen AUTO_INCREMENT = 400000;
+
+ */
+
 
 
 ?>
