@@ -94,8 +94,9 @@ foreach ($aFilesToProcess as $fileName) {
     $splittedFileName   = explode ('_', $fileName);
     $currentIssue       = $splittedFileName[0];
     
-    
-    $desiredWeekOfYear  = substr($splittedFileName[1], 6, 2); // the target week, TODO: leading zeros for sure?
+    // extract desired calendar week
+    $desiredWeekOfYear  = substr(substr($splittedFileName[1], 6), 0, (strlen(substr($splittedFileName[1], 6)) - 4));
+        
     $currentYear        = date("Y"); 
     $currentMonth       = date('m');
     
