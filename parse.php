@@ -94,13 +94,17 @@ foreach ($aFilesToProcess as $fileName) {
     $splittedFileName   = explode ('_', $fileName);
     $currentIssue       = $splittedFileName[0];
     
-    /****************************************************************************/
-    $currentYear        = date("Y"); // this is so weak!!!! 
-    // consider the end of a year parsing files for the 1st calendar week 
-    // of the next year!!!!!
-    /****************************************************************************/
-    $weekOfYear         = substr($splittedFileName[1], 6,2) ;
-    $startDate          = startDate($currentYear, $weekOfYear);
+    
+    $desiredWeekOfYear  = substr($splittedFileName[1], 6, 2); // the target week, TODO: leading zeros for sure?
+    $currentYear        = date("Y"); 
+    $currentMonth       = date('m');
+    
+    // we process in december but target is the very first week of the next year...
+    if ($currentMonth == '12' && $desiredWeekOfYear == '01') {
+        $currentYear ++; // Uh, oh! Being typeless rulez! Sometimes...
+    }
+        
+    $startDate          = startDate($currentYear, $desiredWeekOfYear);
     $endDate            = date ('Y-m-d', strtotime($startDate) + (7 * 24 * 3600));
     
     echo ("Processing file '" . $fileName . "' from '" . $startDate . "' to '" . $endDate . "'...<br />");    
@@ -397,8 +401,8 @@ function moveProcessedFile($fileName)
  ****************************************************************************/
 function startDate($year, $week) 
 { 
-    $firstCalendarWeek = mktime(0,0,0,1,4,$year); // 4th of January is in calendar week #1 for sure!
-    $monday = $firstCalendarWeek + 86400 * (7 * ($week-1)  - date('w', $firstCalendarWeek) + 1);
+    $firstCalendarWeek = mktime(0, 0, 0, 1, 4, $year); // 4th of January is in calendar week #1 for sure!
+    $monday = $firstCalendarWeek + 86400 * (7 * ($week - 1)  - date('w', $firstCalendarWeek) + 1);
     $sunday = $monday + 86400 * 6;
     return date('Y-m-d', $sunday);
 }  
