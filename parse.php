@@ -1,4 +1,5 @@
 <?php
+header("Content-Type:text/plain");
 
 /*****************************************************************************
  * parse.php
@@ -16,7 +17,6 @@
  * determining a date from calendar week relies on a given year!!!!!!!!!!!!!!
  *****************************************************************************/
 
-
 $mysqlHost              = 'localhost';
 $mysqlUser              = 'root';
 $mysqlPass              = '';
@@ -33,6 +33,14 @@ $recordPattern          = "@Fliess:";
 $currentIssue           = "";
 $startDate              = "";
 $currentCategory        = "";
+
+$message                = "JJK import\n";
+
+$recipient              = "";
+
+if ($recipient == "") {
+    die("Dunno where to report to...\n";
+}
         
 $issues = array (
     'OB' => '0',
@@ -79,7 +87,8 @@ $patternChiffre         = '#Chiffre\s(\d+\/\d+)#';
 $aFilesToProcess        = getDirectoryList($inDir, $patternFilename);
 
 if (count($aFilesToProcess) != $expectedNoOfFiles) {
-    die ('Would like to see ' . $expectedNoOfFiles . ' files! Got ' . count($aFilesToProcess) . ' instead... Bailing out... ä²');
+    $message .= "Would like to see " . $expectedNoOfFiles . " files! Got " . count($aFilesToProcess) . " instead... Bailing out...\n";
+    mailOut($message);
 }
 
 $insertCount            = 0;
@@ -101,19 +110,27 @@ foreach ($aFilesToProcess as $fileName) {
     $currentMonth       = date('m');
     
     // we process in december but target is the very first week of the next year...
-    if ($currentMonth == '12' && $desiredWeekOfYear == '01') {
+    if ($currentMonth == '12' && $desiredWeekOfYear == '1') {
         $currentYear ++; // Uh, oh! Being typeless rulez! Sometimes...
     }
         
     $startDate          = startDate($currentYear, $desiredWeekOfYear);
     $endDate            = date ('Y-m-d', strtotime($startDate) + (7 * 24 * 3600));
     
-    echo ("Processing file '" . $fileName . "' from '" . $startDate . "' to '" . $endDate . "'...<br />");    
+    $message .= "Processing file '" . $fileName . "' from '" . $startDate . "' to '" . $endDate . "'...\n";    
+        
+    $fp = fopen('./'. $inDir . '/' . $fileName,'r');
+    if (!$fp) {
+        $message .= "Can't open file '".$fileName."'... Bailing out!\n";
+        mailOut($message);
+    }
     
-    $fp = fopen('./'. $inDir . '/' . $fileName,'r') or die("can't open file");
+    $lineCounter = 0;
     
     while($line = fgets($fp)) {
-    
+        
+        $lineCounter ++;
+        
         $line = str_replace ('@Schlag:', '@Fliess:', $line);        # ummm, don't ask!
         $line = str_replace ('<B>', '', $line);                     # crappy bold tag            
         $line = str_replace ('<$f"Arial">', '', $line);             # strange font defs
@@ -165,7 +182,9 @@ foreach ($aFilesToProcess as $fileName) {
             $record = extractRecord($line);
 
         } else {
-            die ("Error!!! Looks like the line is somewhat garbled...<br />" . $line);
+            mysql_close();
+            $message .= ("Error!!! Looks like the line #" . $lineCounter . " is somewhat garbled...\n");
+            mailOut($message);            
         }        
         
         // conditional insert or update of record
@@ -190,9 +209,9 @@ foreach ($aFilesToProcess as $fileName) {
 
 }
 
-
-die ('I just inserted ' . $insertCount .' records and updated ' . $updateCount . ' of them... Bye!');
+$message .= "I just inserted " . $insertCount ." records and updated " . $updateCount . " of them... Bye!\n";
 mysql_close();
+mailOut($message);
 
 /****************************************************************************
  * extracts category from a given line
@@ -290,7 +309,8 @@ function openDB()
 function fetchRecord($record, $startDate) 
 {
 
-    global $mysqlTable;        
+    global $mysqlTable;
+    global $message;        
 
     $res = false;
 
@@ -298,9 +318,10 @@ function fetchRecord($record, $startDate)
     $result = mysql_query($query);
 
     if (!$result) {
-        $message  = 'Error: ' . mysql_error() . "\n";
-        $message .= 'Query: ' . $query;
-        die($message);
+        $message .= "Error: " . mysql_error() . "\n";
+        $message .= "Query: " . $query ."\n";
+        mysql_close();
+        mailOut($message);
     }
 
     while ($row = mysql_fetch_assoc($result)) {
@@ -321,6 +342,7 @@ function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiff
 {
 
     global $mysqlTable;
+    global $message;
 
     if ($dIssue == 0) {
         $issueFields = 'verlag_id1, verlag_id2, verlag_id3, verlag_id4, verlag_id5, verlag_id6, verlag_id7';
@@ -342,23 +364,25 @@ function insertRecord($record, $startDate, $endDate, $dIssue, $dCategory, $chiff
     $result = mysql_query($query);
     
     if (!$result) {
-        $message  = 'Booom! ' . mysql_error() . "\n";
-        $message .= 'Query: ' . $query;
-        die ($message);        
+        $message .= "Error: " . mysql_error() . "\n";
+        $message .= "Query: " . $query ."\n";
+        mysql_close();
+        mailOut($message);
     }
     
 
 }
 
 /****************************************************************************
- * iupdates a record in db.
+ * updates a record in db.
  *
  *
  *
  ****************************************************************************/
 function updateRecord($recordId, $dIssue) 
 {
-
+    global $message;   
+    
     if ($dIssue == 0) {
         return;
     }
@@ -369,11 +393,12 @@ function updateRecord($recordId, $dIssue)
     $result = mysql_query($query);
     
     if (!$result) {
-        $message  = 'Booom! ' . mysql_error() . "\n";
-        $message .= 'Query: ' . $query;        
+        $message .= "Error: " . mysql_error() . "\n";
+        $message .= "Query: " . $query ."\n";
+        mysql_close();
+        mailOut($message);
         die($message);
     }
-    
     
 }
 
@@ -408,6 +433,13 @@ function startDate($year, $week)
     return date('Y-m-d', $sunday);
 }  
 
+function mailOut($message)
+{
+    global $recipient;
+    
+    mail($recipient, "JJK import", $message);
+    die("Done!");
+}
 /*
 
 look at this amazing attempt of the incredible eidberger ---
