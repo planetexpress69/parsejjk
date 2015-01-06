@@ -427,10 +427,10 @@ function moveProcessedFile($fileName)
  ****************************************************************************/
 function startDate($year, $week) 
 { 
-    $firstCalendarWeek = mktime(0, 0, 0, 1, 4, $year); // 4th of January is in calendar week #1 for sure!
-    $monday = $firstCalendarWeek + 86400 * (7 * ($week - 1)  - date('w', $firstCalendarWeek) + 1);
-    $sunday = $monday + 86400 * 6;
-    return date('Y-m-d', $sunday);
+    if (strlen($week) == 1) {
+        $week = "0" . $week;
+    }
+    return @date("Y-m-d", strtotime($year."W".$week."7"));
 }  
 
 function mailOut($message)
